@@ -1,18 +1,31 @@
-use std::collections::HashMap;
 use chrono::Utc;
+use std::collections::HashMap;
 
 #[path = "../src/main.rs"]
 mod main;
 
-use main::{ElectionResult, ConstituencyResult, Constituency, Party, Candidate, ElectoralSystem, simulate_election};
+use main::{
+    simulate_election, Candidate, Constituency, ConstituencyResult, ElectionResult,
+    ElectoralSystem, Party,
+};
 
 #[test]
 fn test_first_past_the_post_simulation() {
-    let party1 = Party { name: String::from("Party A") };
-    let party2 = Party { name: String::from("Party B") };
+    let party1 = Party {
+        name: String::from("Party A"),
+    };
+    let party2 = Party {
+        name: String::from("Party B"),
+    };
 
-    let candidate1 = Candidate { name: String::from("Alice"), party: party1.clone() };
-    let candidate2 = Candidate { name: String::from("Bob"), party: party2.clone() };
+    let candidate1 = Candidate {
+        name: String::from("Alice"),
+        party: party1.clone(),
+    };
+    let candidate2 = Candidate {
+        name: String::from("Bob"),
+        party: party2.clone(),
+    };
 
     let constituency = Constituency {
         name: String::from("Constituency 1"),
@@ -21,13 +34,19 @@ fn test_first_past_the_post_simulation() {
 
     let constituency_result = ConstituencyResult {
         constituency: constituency.clone(),
-        results: [(party1.clone(), 2), (party2.clone(), 1)].iter().cloned().collect(),
+        results: [(party1.clone(), 2), (party2.clone(), 1)]
+            .iter()
+            .cloned()
+            .collect(),
     };
 
     let election_result = ElectionResult {
         datetime: Utc::now(),
         constituencies: vec![constituency_result],
-        overall_result: [(party1.clone(), 2), (party2.clone(), 1)].iter().cloned().collect(),
+        overall_result: [(party1.clone(), 2), (party2.clone(), 1)]
+            .iter()
+            .cloned()
+            .collect(),
     };
 
     let electoral_system = ElectoralSystem::FirstPastThePost;

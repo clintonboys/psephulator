@@ -19,5 +19,5 @@ name = "main"
 path = "src/main.rs"
 
 [[bin]]
-name = "scraper"
-path = "src/bin/scraper.rs"
+name = "scrape"
+path = "src/bin/scrape.rs"

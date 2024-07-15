@@ -1,9 +1,9 @@
-use std::collections::HashMap;
-use std::fs;
-use std::path::Path;
 use chrono::{DateTime, Utc};
 use dialoguer::{theme::ColorfulTheme, Select};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::fs;
+use std::path::Path;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ElectionResult {
@@ -42,23 +42,35 @@ pub enum ElectoralSystem {
     // Add more systems here
 }
 
-pub fn simulate_election(election_result: &ElectionResult, electoral_system: &ElectoralSystem) -> HashMap<String, u32> {
+pub fn simulate_election(
+    election_result: &ElectionResult,
+    electoral_system: &ElectoralSystem,
+) -> HashMap<String, u32> {
     match electoral_system {
         ElectoralSystem::FirstPastThePost => simulate_first_past_the_post(election_result),
-        ElectoralSystem::ProportionalRepresentation => simulate_proportional_representation(election_result),
-        // Add more systems here
+        ElectoralSystem::ProportionalRepresentation => {
+            simulate_proportional_representation(election_result)
+        } // Add more systems here
     }
 }
 
 fn simulate_first_past_the_post(election_result: &ElectionResult) -> HashMap<String, u32> {
     let mut seat_wins: HashMap<String, u32> = HashMap::new();
-    
+
     for constituency_result in &election_result.constituencies {
-        if let Some((winning_party, _)) = constituency_result.results.iter().max_by_key(|&(_, votes)| votes) {
+        if let Some((winning_party, _)) = constituency_result
+            .results
+            .iter()
+            .max_by_key(|&(_, votes)| votes)
+        {
             *seat_wins.entry(winning_party.clone()).or_insert(0) += 1;
+            println!(
+                "{}: {}",
+                constituency_result.constituency.name, winning_party
+            )
         }
     }
-    
+
     seat_wins
 }
 
@@ -69,7 +81,7 @@ fn simulate_proportional_representation(_election_result: &ElectionResult) -> Ha
 
 fn main() {
     println!("Welcome to Psephulator");
-    println!("----- v 0.1.0 --------");    
+    println!("----- v 0.1.0 --------");
 
     let options = &["Load Election Results", "Simulate an Election"];
     let selection = Select::with_theme(&ColorfulTheme::default())
@@ -82,10 +94,10 @@ fn main() {
     match selection {
         0 => {
             load_election_results();
-        },
+        }
         1 => {
             simulate_an_election();
-        },
+        }
         _ => unreachable!(),
     }
 }
@@ -159,17 +171,27 @@ fn simulate_an_election() {
 
             let simulated_result = simulate_election(&election_result, &electoral_system);
             println!("Simulated Result: {:?}", simulated_result);
-        },
+        }
         _ => unreachable!(),
     }
 }
 
 fn setup_two_party_fptp_election() -> ElectionResult {
-    let party1 = Party { name: String::from("Party A") };
-    let party2 = Party { name: String::from("Party B") };
+    let party1 = Party {
+        name: String::from("Party A"),
+    };
+    let party2 = Party {
+        name: String::from("Party B"),
+    };
 
-    let candidate1 = Candidate { name: String::from("Alice"), party: party1.clone() };
-    let candidate2 = Candidate { name: String::from("Bob"), party: party2.clone() };
+    let candidate1 = Candidate {
+        name: String::from("Alice"),
+        party: party1.clone(),
+    };
+    let candidate2 = Candidate {
+        name: String::from("Bob"),
+        party: party2.clone(),
+    };
 
     let constituency = Constituency {
         name: String::from("Constituency 1"),
@@ -178,12 +200,18 @@ fn setup_two_party_fptp_election() -> ElectionResult {
 
     let constituency_result = ConstituencyResult {
         constituency: constituency.clone(),
-        results: [(party1.name.clone(), 2), (party2.name.clone(), 1)].iter().cloned().collect(),
+        results: [(party1.name.clone(), 2), (party2.name.clone(), 1)]
+            .iter()
+            .cloned()
+            .collect(),
     };
 
     ElectionResult {
         datetime: Utc::now(),
         constituencies: vec![constituency_result],
-        overall_result: [(party1.name.clone(), 2), (party2.name.clone(), 1)].iter().cloned().collect(),
+        overall_result: [(party1.name.clone(), 2), (party2.name.clone(), 1)]
+            .iter()
+            .cloned()
+            .collect(),
     }
 }
