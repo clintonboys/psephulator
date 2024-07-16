@@ -39,18 +39,22 @@ pub struct Candidate {
 pub enum ElectoralSystem {
     FirstPastThePost,
     ProportionalRepresentation,
-    // Add more systems here
+    AlternativeVote, // Added for AV system
 }
 
 pub fn simulate_election(
     election_result: &ElectionResult,
     electoral_system: &ElectoralSystem,
+    preference_flows: Option<HashMap<String, HashMap<String, f32>>>,
 ) -> HashMap<String, u32> {
     match electoral_system {
         ElectoralSystem::FirstPastThePost => simulate_first_past_the_post(election_result),
         ElectoralSystem::ProportionalRepresentation => {
             simulate_proportional_representation(election_result)
-        } // Add more systems here
+        }
+        ElectoralSystem::AlternativeVote => {
+            simulate_alternative_vote(election_result, preference_flows.unwrap())
+        }
     }
 }
 
@@ -64,10 +68,6 @@ fn simulate_first_past_the_post(election_result: &ElectionResult) -> HashMap<Str
             .max_by_key(|&(_, votes)| votes)
         {
             *seat_wins.entry(winning_party.clone()).or_insert(0) += 1;
-            println!(
-                "{}: {}",
-                constituency_result.constituency.name, winning_party
-            )
         }
     }
 
@@ -77,6 +77,85 @@ fn simulate_first_past_the_post(election_result: &ElectionResult) -> HashMap<Str
 fn simulate_proportional_representation(_election_result: &ElectionResult) -> HashMap<String, u32> {
     // Implement Proportional Representation logic here
     HashMap::new()
+}
+
+fn simulate_alternative_vote(
+    election_result: &ElectionResult,
+    preference_flows: HashMap<String, HashMap<String, f32>>,
+) -> HashMap<String, u32> {
+    let mut seat_wins: HashMap<String, u32> = HashMap::new();
+
+    for constituency_result in &election_result.constituencies {
+        let mut votes = constituency_result.results.clone();
+        let mut eliminated = Vec::new();
+        println!("{}", constituency_result.constituency.name.clone());
+        while votes.len() > 2 {
+            // Find the party with the minimum votes and remove it
+            let (min_party, min_votes) = votes
+                .iter()
+                .min_by_key(|&(_, &votes)| votes)
+                .map(|(party, &votes)| (party.clone(), votes))
+                .unwrap();
+
+            votes.remove(&min_party);
+            eliminated.push(min_party.clone());
+
+            let remaining_parties: Vec<_> = votes.keys().cloned().collect();
+            for (party, &party_votes) in preference_flows.get(&min_party).unwrap_or(&HashMap::new())
+            {
+                if remaining_parties.contains(party) {
+                    let additional_votes = ((min_votes as f32) * party_votes).round() as u32;
+                    println!("Party {} gets {} additional votes", party, additional_votes);
+                    *votes.get_mut(party).unwrap() += additional_votes;
+                }
+            }
+
+            // Redistribute votes for the eliminated party proportionally if it was previously allocated to eliminated parties
+            let mut redistributed_votes = 0;
+            if !eliminated.is_empty() {
+                for (party, &percentage) in
+                    preference_flows.get(&min_party).unwrap_or(&HashMap::new())
+                {
+                    if eliminated.contains(&party) {
+                        let redistributed = ((min_votes as f32) * percentage).round() as u32; 
+                        println!("Redistributed {} for {}", redistributed, party);
+                        redistributed_votes += redistributed;
+                    }
+                }
+
+                let total_remaining_percentage: f32 = remaining_parties
+                    .iter()
+                    .map(|p| {
+                        preference_flows
+                            .get(&min_party)
+                            .unwrap_or(&HashMap::new())
+                            .get(p)
+                            .cloned()
+                            .unwrap_or(0.0)
+                    })
+                    .sum();
+
+                for party in &remaining_parties {
+                    if let Some(&party_votes) = preference_flows
+                        .get(&min_party)
+                        .unwrap_or(&HashMap::new())
+                        .get(party)
+                    {
+                        let proportional_share =
+                            (party_votes / total_remaining_percentage) * redistributed_votes as f32;
+                        *votes.get_mut(party).unwrap() += proportional_share.round() as u32;
+                    }
+                }
+            }
+        }
+
+        // Determine the winner among the last two remaining parties
+        let (winner, _) = votes.iter().max_by_key(|&(_, &votes)| votes).unwrap();
+        *seat_wins.entry(winner.clone()).or_insert(0) += 1;
+        println!("Winner {} ({})", winner.clone(), seat_wins["LAB"]);
+    }
+
+    return seat_wins
 }
 
 fn main() {
@@ -120,7 +199,11 @@ fn load_election_results() {
     println!("Loaded Election Result");
 
     // Now the user can simulate results in a different electoral system
-    let electoral_systems = &["First Past The Post", "Proportional Representation"];
+    let electoral_systems = &[
+        "First Past The Post",
+        "Proportional Representation",
+        "Alternative Vote",
+    ];
     let system_selection = Select::with_theme(&ColorfulTheme::default())
         .with_prompt("Choose an electoral system to simulate results")
         .default(0)
@@ -131,11 +214,22 @@ fn load_election_results() {
     let electoral_system = match system_selection {
         0 => ElectoralSystem::FirstPastThePost,
         1 => ElectoralSystem::ProportionalRepresentation,
+        2 => ElectoralSystem::AlternativeVote,
         _ => unreachable!(),
     };
 
-    let simulated_result = simulate_election(&election_result, &electoral_system);
-    println!("Simulated Result: {:?}", simulated_result);
+    let simulated_result = if let ElectoralSystem::AlternativeVote = electoral_system {
+        let preference_flows_file = select_preference_flows_file();
+        let preference_flows = load_preference_flows(&preference_flows_file);
+        simulate_election(&election_result, &electoral_system, Some(preference_flows));
+    } else {
+        simulate_election(&election_result, &electoral_system, None);
+    };
+
+    println!(
+        "Simulated result: {}",
+        serde_json::to_string_pretty(&simulated_result).unwrap()
+    );
 }
 
 fn load_election_data<P: AsRef<Path>>(path: P) -> ElectionResult {
@@ -155,7 +249,10 @@ fn simulate_an_election() {
     match selection {
         0 => {
             let election_result = setup_two_party_fptp_election();
-            let electoral_systems = &["First Past The Post", "Proportional Representation"];
+            let electoral_systems = &[
+                "First Past The Post",
+                "Alternative Vote",
+            ];
             let system_selection = Select::with_theme(&ColorfulTheme::default())
                 .with_prompt("Choose an electoral system to simulate results")
                 .default(0)
@@ -163,17 +260,55 @@ fn simulate_an_election() {
                 .interact()
                 .unwrap();
 
-            let electoral_system = match system_selection {
-                0 => ElectoralSystem::FirstPastThePost,
-                1 => ElectoralSystem::ProportionalRepresentation,
-                _ => unreachable!(),
-            };
+            // let electoral_system = match system_selection {
+            //     0 => ElectoralSystem::FirstPastThePost,
+            //     1 => ElectoralSystem::AlternativeVote,
+            //     _ => unreachable!(),
+            // };
 
-            let simulated_result = simulate_election(&election_result, &electoral_system);
-            println!("Simulated Result: {:?}", simulated_result);
+            // let simulated_result = if let ElectoralSystem::AlternativeVote = electoral_system {
+            //     let preference_flows_file = select_preference_flows_file();
+            //     let preference_flows = load_preference_flows(&preference_flows_file);
+            //         simulate_election(&election_result, &electoral_system, Some(preference_flows))
+            // } else {
+            //     simulate_election(&election_result, &electoral_system, None)
+            // };
+            match system_selection {
+                0 => {
+                    let election_result = setup_two_party_fptp_election();
+                    let simulated_result = simulate_election(&election_result, &ElectoralSystem::FirstPastThePost, None);
+                    println!("Simulated Result: {:?}", simulated_result);
+                }
+                1 => {
+                    let election_result = setup_two_party_fptp_election();
+                    let preference_flows_file = select_preference_flows_file();
+                    let preference_flows = load_preference_flows(&preference_flows_file);
+                    let simulated_result = simulate_election(&election_result, &ElectoralSystem::AlternativeVote, Some(preference_flows));
+                    println!("Simulated Result: {:?}", simulated_result);
+                },
+                _ => unreachable!(),       
+            }
         }
         _ => unreachable!(),
     }
+}
+
+fn select_preference_flows_file() -> String {
+    let options = &["preference_flows_england.json"]; // Add more files as needed
+    let selection = Select::with_theme(&ColorfulTheme::default())
+        .with_prompt("Choose a preference flow file")
+        .default(0)
+        .items(&options[..])
+        .interact()
+        .unwrap();
+
+    options[selection].to_string()
+}
+
+fn load_preference_flows(file_name: &str) -> HashMap<String, HashMap<String, f32>> {
+    let file_path = format!("data/{}", file_name); // Adjust the path as necessary
+    let file_content = fs::read_to_string(&file_path).expect("Unable to read file");
+    serde_json::from_str(&file_content).expect("JSON was not well-formatted")
 }
 
 fn setup_two_party_fptp_election() -> ElectionResult {
@@ -214,4 +349,24 @@ fn setup_two_party_fptp_election() -> ElectionResult {
             .cloned()
             .collect(),
     }
+}
+
+fn get_preference_flows(election_result: &ElectionResult) -> HashMap<String, HashMap<String, f32>> {
+    let mut preference_flows = HashMap::new();
+
+    for constituency_result in &election_result.constituencies {
+        for candidate in &constituency_result.constituency.candidates {
+            if !preference_flows.contains_key(&candidate.party.name) {
+                let mut flow = HashMap::new();
+                for other_candidate in &constituency_result.constituency.candidates {
+                    if candidate.party.name != other_candidate.party.name {
+                        flow.insert(other_candidate.party.name.clone(), 0.5);
+                    }
+                }
+                preference_flows.insert(candidate.party.name.clone(), flow);
+            }
+        }
+    }
+
+    preference_flows
 }

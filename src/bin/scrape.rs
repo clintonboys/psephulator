@@ -53,19 +53,35 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let row_selector = Selector::parse("tr").unwrap();
     let cell_selector = Selector::parse("td").unwrap();
 
-    let table = document
-        .select(&table_selector)
-        .next()
-        .expect("No table found");
+    let tables: Vec<_> = document.select(&table_selector).collect();
 
+    let table_names = ["England", "Scotland", "Wales", "Northern Ireland"];
     let mut constituencies = Vec::new();
     let mut overall_result = HashMap::new();
     let special_constituencies: [&str; 2] = ["Birmingham Hall Green and Moseley", "Bradford West"];
 
-    for row in table.select(&row_selector).skip(1) {
+    let table_party_mapping: HashMap<&str, Vec<&str>> = [
+        ("England", vec!["LAB", "CON", "REF", "LD", "GRN", "OTH", "X"]),
+        ("Scotland", vec!["LAB", "SNP", "CON", "LD", "REF", "GRN", "OTH"]),
+        ("Wales", vec!["LAB", "CON", "REF", "PC", "LD", "GRN", "OTH"]),
+        ("Northern Ireland", vec!["SF", "DUP", "APNI", "UUP", "SDLP", "TUV", "IND", "OTH"]),
+    ].iter().cloned().collect();
+
+    let vote_indices_mapping = [[11, 12, 13, 14, 15, 16, 0],
+        [9, 10, 11, 12, 13, 14, 15],
+        [9, 10, 11, 12, 13, 14, 15],
+        [9, 10, 11, 12, 13, 14, 15],
+    ];
+
+    for (i, table) in tables.iter().enumerate() {
+        let table_name = table_names[i];
+        let party_mapping = table_party_mapping.get(table_name).unwrap();
+        let vote_indices = vote_indices_mapping[i];
+
+        for row in table.select(&row_selector).skip(1) {
         // Skip the header row
         let cells: Vec<_> = row.select(&cell_selector).collect();
-        if cells.len() < 18 {
+        if cells.len() < 16 {
             // Ensure the row has enough columns
             continue;
         }
@@ -213,22 +229,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 });
             }
         } else {
-            println!("{}", constituency_name);
             let mut candidates = Vec::new();
             let mut results = HashMap::new();
 
-            let vote_indices = vec![11, 12, 13, 14, 15, 16];
-            let parties = vec!["LAB", "CON", "REF", "LD", "GRN", "OTH"];
+            // let parties = vec!["LAB", "CON", "REF", "LD", "GRN", "OTH"];
 
             for (i, &vote_index) in vote_indices.iter().enumerate() {
-                println!("{}: {}", i, vote_index);
                 if vote_indices[i] >= cells.len() {
                     continue;
                 }
 
                 if let Some(party_cell) = cells.get(vote_index) {
-                    let party_name = parties[i];
-                    println!("{}", party_name);
+                    let party_name = party_mapping[i];
                     let votes = party_cell
                         .text()
                         .collect::<Vec<_>>()
@@ -237,14 +249,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .replace(",", "")
                         .parse()
                         .unwrap_or(0);
-                    println!("{}", votes);
                     candidates.push(Candidate {
                         name: format!("Candidate{}", i + 1),
                         party: Party {
                             name: party_name.clone().to_string(),
                         },
                     });
-
                     *overall_result
                         .entry(party_name.clone().to_string())
                         .or_insert(0) += votes;
@@ -261,7 +271,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             });
         }
     }
-
+    }
     let election_result = ElectionResult {
         datetime: Utc::now(),
         constituencies,
