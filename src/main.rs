@@ -152,7 +152,7 @@ fn simulate_alternative_vote(
         // Determine the winner among the last two remaining parties
         let (winner, _) = votes.iter().max_by_key(|&(_, &votes)| votes).unwrap();
         *seat_wins.entry(winner.clone()).or_insert(0) += 1;
-        println!("Winner {} ({})", winner.clone(), seat_wins["LAB"]);
+        println!("Winner {} (LAB: {})", winner.clone(), seat_wins["LAB"]);
     }
 
     return seat_wins
@@ -218,18 +218,16 @@ fn load_election_results() {
         _ => unreachable!(),
     };
 
-    let simulated_result = if let ElectoralSystem::AlternativeVote = electoral_system {
+     if let ElectoralSystem::AlternativeVote = electoral_system {
         let preference_flows_file = select_preference_flows_file();
         let preference_flows = load_preference_flows(&preference_flows_file);
-        simulate_election(&election_result, &electoral_system, Some(preference_flows));
+        let simulated_result = simulate_election(&election_result, &electoral_system, Some(preference_flows));
+        println!(
+            "Simulated result: {:?}", simulated_result);    
     } else {
         simulate_election(&election_result, &electoral_system, None);
     };
 
-    println!(
-        "Simulated result: {}",
-        serde_json::to_string_pretty(&simulated_result).unwrap()
-    );
 }
 
 fn load_election_data<P: AsRef<Path>>(path: P) -> ElectionResult {

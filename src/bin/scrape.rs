@@ -6,6 +6,7 @@ use serde_json::to_string_pretty;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
+use std::ops::Sub;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ElectionResult {
@@ -21,8 +22,14 @@ pub struct ConstituencyResult {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Subdivision {
+    name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Constituency {
     pub name: String,
+    pub subdivision: Subdivision,
     pub candidates: Vec<Candidate>,
 }
 
@@ -105,6 +112,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 results.insert("Independent3".clone().to_string(), 733 as u32);
                 constituencies.push(ConstituencyResult {
                     constituency: Constituency {
+                        subdivision: Subdivision {
+                            name: table_name.to_string()
+                        },
                         name: constituency_name,
                         candidates: [
                             Candidate {
@@ -172,6 +182,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 results.insert("Independent2".clone().to_string(), 334 as u32);
                 constituencies.push(ConstituencyResult {
                     constituency: Constituency {
+                        subdivision: Subdivision {
+                            name: "England".to_string(),
+                        },
                         name: constituency_name,
                         candidates: [
                             Candidate {
@@ -264,6 +277,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             constituencies.push(ConstituencyResult {
                 constituency: Constituency {
+                    subdivision: Subdivision {
+                        name: table_name.to_string(),
+                    },
                     name: constituency_name,
                     candidates,
                 },
