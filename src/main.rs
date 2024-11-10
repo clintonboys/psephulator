@@ -88,7 +88,6 @@ fn simulate_alternative_vote(
     for constituency_result in &election_result.constituencies {
         let mut votes = constituency_result.results.clone();
         let mut eliminated = Vec::new();
-        println!("{}", constituency_result.constituency.name.clone());
         while votes.len() > 2 {
             // Find the party with the minimum votes and remove it
             let (min_party, min_votes) = votes
@@ -105,7 +104,7 @@ fn simulate_alternative_vote(
             {
                 if remaining_parties.contains(party) {
                     let additional_votes = ((min_votes as f32) * party_votes).round() as u32;
-                    println!("Party {} gets {} additional votes", party, additional_votes);
+                    // println!("Party {} gets {} additional votes", party, additional_votes);
                     *votes.get_mut(party).unwrap() += additional_votes;
                 }
             }
@@ -118,7 +117,7 @@ fn simulate_alternative_vote(
                 {
                     if eliminated.contains(&party) {
                         let redistributed = ((min_votes as f32) * percentage).round() as u32; 
-                        println!("Redistributed {} for {}", redistributed, party);
+                        // println!("Redistributed {} for {}", redistributed, party);
                         redistributed_votes += redistributed;
                     }
                 }
@@ -152,7 +151,6 @@ fn simulate_alternative_vote(
         // Determine the winner among the last two remaining parties
         let (winner, _) = votes.iter().max_by_key(|&(_, &votes)| votes).unwrap();
         *seat_wins.entry(winner.clone()).or_insert(0) += 1;
-        println!("Winner {} (LAB: {})", winner.clone(), seat_wins["LAB"]);
     }
 
     return seat_wins
@@ -225,7 +223,9 @@ fn load_election_results() {
         println!(
             "Simulated result: {:?}", simulated_result);    
     } else {
-        simulate_election(&election_result, &electoral_system, None);
+        let simulated_result = simulate_election(&election_result, &electoral_system, None);
+        println!(
+            "Simulated result: {:?}", simulated_result);    
     };
 
 }
